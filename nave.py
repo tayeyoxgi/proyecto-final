@@ -11,8 +11,9 @@ puntuacion = 0
 id_marcador_sombra = None
 id_marcador_texto = None
 
-# Variables de partículas
+# Variables de partículas y disparos
 particulas = []
+disparos = [] # Lista para almacenar los proyectiles activos
 
 # Variables de la nave y animación
 estado = "despegando"  
@@ -116,7 +117,44 @@ def presionar_abajo(event):
     nave_velocidad_x -= math.sin(rad) * 0.4
     nave_velocidad_y += math.cos(rad) * 0.4
 
-# --- 5. GENERACIÓN DE ESTRELLAS ---
+def presionar_espacio(event):
+    global disparos, canvas, nave_x, nave_y, nave_angulo, estado
+    if estado != "jugando": return  
+    
+    # El disparo nace en la punta/centro de la nave y va hacia donde apunta el ángulo
+    rad = math.radians(nave_angulo)
+    velocidad_disparo = 10
+    
+    vx = math.sin(rad) * velocidad_disparo
+    vy = -math.cos(rad) * velocidad_disparo
+    radio = 3
+    
+    # Dibujar proyectil pequeño de color cian brillante
+    id_d = canvas.create_oval(nave_x - radio, nave_y - radio, nave_x + radio, nave_y + radio, fill="#00FFFF", outline="")
+    
+    disparos.append({
+        "id": id_d, "x": nave_x, "y": nave_y, "vx": vx, "vy": vy
+    })
+
+# --- 5. GESTIÓN DE PROYECTILES ---
+def actualizar_disparos():
+    global disparos, canvas
+    disparos_vivos = []
+    
+    for d in disparos:
+        d["x"] += d["vx"]
+        d["y"] += d["vy"]
+        
+        # Comprobar si el disparo sigue dentro de la pantalla
+        if 0 <= d["x"] <= ancho_pantalla and 0 <= d["y"] <= alto_pantalla:
+            canvas.coords(d["id"], d["x"] - 3, d["y"] - 3, d["x"] + 3, d["y"] + 3)
+            disparos_vivos.append(d)
+        else:
+            canvas.delete(d["id"]) # Borrar del canvas si sale del mapa
+            
+    disparos = disparos_vivos
+
+# --- 6. GENERACIÓN DE ESTRELLAS ---
 def generar_estrellas():
     global canvas
     for _ in range(60):  
@@ -126,7 +164,7 @@ def generar_estrellas():
         color_estrella = random.choice(["#FFFFFF", "#E0E0FF", "#FFFFD0"])
         canvas.create_oval(ex, ey, ex + tamano, ey + tamano, fill=color_estrella, outline="")
 
-# --- 6. BUCLE PRINCIPAL DE JUEGO ---
+# --- 7. BUCLE PRINCIPAL DE JUEGO ---
 def actualizar_juego():
     global canvas, ventana, id_marcador_sombra, id_marcador_texto
     global estado, nave_x, nave_y, nave_velocidad_x, nave_velocidad_y, id_planeta, id_nave
@@ -159,19 +197,24 @@ def actualizar_juego():
             
         actualizar_grafico_nave()
 
-    # Actualizar la física visual de todas las partículas
+    # Actualizar la física visual de todas las partículas y disparos
     actualizar_particulas()
+    actualizar_disparos()
     
-    # Control de capas (Traer nave y textos sobre las partículas)
+    # Control de capas (Traer nave, disparos y textos al frente)
     if id_marcador_sombra and id_marcador_texto:
         canvas.tag_raise(id_marcador_sombra)
         canvas.tag_raise(id_marcador_texto)
+    
+    for d in disparos:
+        canvas.tag_raise(d["id"])
+        
     if id_nave:
         canvas.tag_raise(id_nave) 
         
     ventana.after(30, actualizar_juego)
 
-# --- 7. CONFIGURACIÓN DE LA INTERFAZ ---
+# --- 8. CONFIGURACIÓN DE LA INTERFAZ ---
 ventana = tk.Tk()
 ventana.title("Asteroids Space Simulator")
 ventana.resizable(False, False)
@@ -184,6 +227,7 @@ ventana.bind("<Left>", presionar_izquierda)
 ventana.bind("<Right>", presionar_derecha)
 ventana.bind("<Up>", presionar_arriba)
 ventana.bind("<Down>", presionar_abajo)
+ventana.bind("<space>", presionar_espacio) # Captura de la barra espaciadora
 
 generar_estrellas()
 inicializar_nave_y_planeta()
